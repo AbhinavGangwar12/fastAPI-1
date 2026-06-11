@@ -1,35 +1,45 @@
 from fastapi import FastAPI, HTTPException, status, Depends
-from pydantic import BaseModel , Field
+from pydantic import BaseModel, Field
 from typing import Annotated 
 
-app = FastAPI(title="Practice")
+app = FastAPI(title="The Hedge Knight API")
 
-def validate_squire(age: int):
-    if age < 10:
+# 1. The Pydantic Model (Pure Data Shape)
+class SquireApply(BaseModel):
+    name: str = Field(..., description="Name of the applicant")
+    age: int = Field(..., description="Age of the applicant")
+
+class SquireResponse(SquireApply):
+    id: int
+    message: str
+
+# 2. The Dependency (Executes business logic on the data)
+def validate_squire(squire: SquireApply):
+    if squire.age < 10:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Applicants must be at least 10 years old."
         )
-    return age
+    return squire # Return the validated object
 
-class SquireApply(BaseModel):
-    name : str = Field(..., description="Name of the applicant")
-    age : Annotated[int, Depends(validate_squire), Field(..., description="Age of the applicant")]
+# 3. Create the Annotated Injection Type
+ValidatedSquire = Annotated[SquireApply, Depends(validate_squire)]
 
-class SquireResponse(SquireApply):
-    id : int = Field(..., description="ID of the squire")
-    message: str = Field(..., description="Application status message")
 squires = []
 curr_id = 1
+
+# 4. The Endpoint (Inject the dependency here)
 @app.post("/squire/apply", status_code=status.HTTP_201_CREATED, response_model=SquireResponse)
-def apply_squire(application: SquireApply):
+def apply_squire(application: ValidatedSquire):
     global curr_id
+    
     squire_info = application.model_dump()
     squire = {
-        "id" : curr_id,
-        "message" : f"{squire_info['name']} is hired as a squire."
+        "id": curr_id,
+        "message": f"{squire_info['name']} is hired as a squire.", # Comma added!
         **squire_info
     }
+    
     curr_id += 1
     squires.append(squire)
     return squire
